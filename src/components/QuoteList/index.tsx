@@ -3,6 +3,7 @@ import { FileText, Clock, DollarSign, Eye } from 'lucide-react';
 import { Quote } from '../../types';
 import { QuotePreview } from '../QuotePreview';
 import { formatCurrency } from '../../utils/formatters';
+import { useSupabase } from '../../contexts/SupabaseContext';
 import { format } from 'date-fns';
 
 interface QuoteListProps {
@@ -12,11 +13,22 @@ interface QuoteListProps {
 
 export function QuoteList({ quotes, onStatusChange }: QuoteListProps) {
   const [selectedQuote, setSelectedQuote] = React.useState<Quote>();
+  const { user } = useSupabase();
   
   const handleViewQuote = (quote: Quote) => {
     setSelectedQuote(quote);
   };
 
+  const handleStatusChange = async (quoteId: string, status: Quote['status']) => {
+    if (user) {
+      try {
+        await updateQuoteStatus(quoteId, status, user);
+        onStatusChange();
+      } catch (error) {
+        console.error('Error updating quote status:', error);
+      }
+    }
+  };
   const handleCloseQuote = () => {
     setSelectedQuote(undefined);
   };

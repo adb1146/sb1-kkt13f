@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Plus, FileText, Clock, DollarSign, CheckCircle, XCircle, AlertCircle, FileTextIcon } from 'lucide-react';
 import { SavedRating } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
@@ -7,7 +7,8 @@ import { QuoteDialog } from '../QuoteDialog';
 import { QuoteList } from '../QuoteList';
 import { RatingList } from '../RatingList';
 import { HomeTutorial } from '../HomeTutorial';
-import { getQuotes } from '../../utils/storage';
+import { getQuotes, getRatings } from '../../utils/storage';
+import { useSupabase } from '../../contexts/SupabaseContext';
 
 interface HomeTabProps {
   savedRatings: SavedRating[];
@@ -15,13 +16,20 @@ interface HomeTabProps {
 }
 
 export function HomeTab({ savedRatings, onNewRating }: HomeTabProps) {
+  const { user } = useSupabase();
   const [selectedRating, setSelectedRating] = React.useState<SavedRating>();
-  const [quotes, setQuotes] = React.useState(() => getQuotes());
+  const [quotes, setQuotes] = React.useState([]);
   const [showTutorial, setShowTutorial] = React.useState(() => {
     const tutorialSeen = localStorage.getItem('homeTutorialSeen');
     return !tutorialSeen;
   });
   const [activeSection, setActiveSection] = React.useState<'ratings' | 'quotes'>('ratings');
+
+  useEffect(() => {
+    if (user) {
+      getQuotes(user).then(setQuotes).catch(console.error);
+    }
+  }, [user]);
 
   const handleCloseTutorial = () => {
     setShowTutorial(false);
@@ -29,7 +37,9 @@ export function HomeTab({ savedRatings, onNewRating }: HomeTabProps) {
   };
 
   const handleQuoteGenerated = () => {
-    setQuotes(getQuotes());
+    if (user) {
+      getQuotes(user).then(setQuotes).catch(console.error);
+    }
     setActiveSection('quotes');
   };
 

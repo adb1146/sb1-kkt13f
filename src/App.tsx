@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Settings, Brain, HelpCircle, Shield } from 'lucide-react';
+import { Play, Settings, Brain, HelpCircle, Shield, LogOut } from 'lucide-react';
 import { BusinessForm } from './components/BusinessForm';
 import { LocationForm } from './components/LocationForm';
 import { PriorInsuranceForm } from './components/PriorInsuranceForm';
@@ -23,6 +23,7 @@ import { saveRating, getRatings } from './utils/storage';
 import { useSupabase } from './contexts/SupabaseContext';
 import { AuthContainer } from './components/auth/AuthContainer';
 import { PSAdvisoryLogo } from './components/PSAdvisoryLogo';
+import { supabase } from './utils/supabase';
 
 const initialBusinessInfo: BusinessInfo = {
   name: '',
@@ -59,11 +60,17 @@ function App() {
   const [currentSection, setCurrentSection] = React.useState('business');
   const [activeTab, setActiveTab] = React.useState<'home' | 'new' | 'help'>('home');
   const [showAIAssistant, setShowAIAssistant] = React.useState(true);
-  const [savedRatings, setSavedRatings] = React.useState<SavedRating[]>(() => getRatings());
+  const [savedRatings, setSavedRatings] = React.useState<SavedRating[]>([]);
   const [showTutorial, setShowTutorial] = React.useState(() => {
     const tutorialSeen = localStorage.getItem('tutorialSeen');
     return !tutorialSeen;
   });
+
+  React.useEffect(() => {
+    if (user) {
+      getRatings(user).then(setSavedRatings).catch(console.error);
+    }
+  }, [user]);
 
   if (showAdmin) {
     return <RatingAdmin onClose={() => setShowAdmin(false)} />;
@@ -78,7 +85,7 @@ function App() {
     return <AuthContainer />;
   }
 
-  const handleSaveRating = (premium: number) => {
+  const handleSaveRating = async (premium: number) => {
     const newRating: SavedRating = {
       id: Date.now().toString(),
       businessInfo: { ...businessInfo },
@@ -86,8 +93,17 @@ function App() {
       totalPremium: premium,
       status: 'draft'
     };
-    saveRating(newRating);
-    setSavedRatings([newRating, ...savedRatings]);
+    
+    if (user) {
+      try {
+        await saveRating(newRating, user);
+        const updatedRatings = await getRatings(user);
+        setSavedRatings(updatedRatings);
+      } catch (error) {
+        console.error('Error saving rating:', error);
+      }
+    }
+    
     setActiveTab('home');
   };
 
@@ -135,6 +151,14 @@ function App() {
               >
                 <Settings className="w-4 h-4" />
                 Admin
+              </button>
+              <button
+                onClick={async () => await supabase.auth.signOut()}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700"
+                title="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign Out
               </button>
               <button
                 onClick={() => setActiveTab('help')}

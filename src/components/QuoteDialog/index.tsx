@@ -4,6 +4,7 @@ import { SavedRating, Quote } from '../../types';
 import { format, addYears } from 'date-fns';
 import { formatCurrency } from '../../utils/formatters';
 import { saveQuote } from '../../utils/storage';
+import { useSupabase } from '../../contexts/SupabaseContext';
 import { QuotePreview } from '../QuotePreview';
 
 interface QuoteDialogProps {
@@ -26,10 +27,13 @@ export function QuoteDialog({ rating, isOpen, onClose, onQuoteGenerated }: Quote
   );
   const [notes, setNotes] = React.useState('');
   const [quote, setQuote] = React.useState<Quote>();
+  const { user } = useSupabase();
 
   if (!isOpen || !rating) return null;
 
-  const handleGenerateQuote = () => {
+  const handleGenerateQuote = async () => {
+    if (!user) return;
+
     const newQuote: Quote = {
       id: Date.now().toString(),
       ratingId: rating.id,
@@ -43,8 +47,14 @@ export function QuoteDialog({ rating, isOpen, onClose, onQuoteGenerated }: Quote
       notes
     };
 
-    setQuote(newQuote);
-    saveQuote(newQuote);
+    try {
+      await saveQuote(newQuote, user);
+      setQuote(newQuote);
+      onQuoteGenerated?.();
+    } catch (error) {
+      console.error('Error generating quote:', error);
+    }
+
     onQuoteGenerated?.();
   };
 

@@ -128,7 +128,7 @@ function App() {
               <div className="flex items-center gap-6">
                 <PSAdvisoryLogo />
                 <div className="h-8 w-px bg-gray-200" />
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-2xl font-bold text-gray-900 whitespace-nowrap">
                   Workers' Compensation Insurance Rating
                 </h1>
               </div>

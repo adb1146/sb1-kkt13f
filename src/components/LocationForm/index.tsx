@@ -1,8 +1,11 @@
 import React from 'react';
-import { MapPin, Plus, Trash2 } from 'lucide-react';
+import { MapPin, Plus, Trash2, Brain, Loader2, CheckCircle, Search } from 'lucide-react';
 import { Address } from '../../types';
 import { states } from '../../utils/constants';
 import { ValidationMessage } from '../ValidationMessage';
+import { suggestLocation, validateAddress } from '../../utils/ai/locationAssistant';
+import { getAddressSuggestions, formatAddress } from '../../utils/ai/locationTypeahead';
+import { useDebounce } from '../../utils/hooks';
 
 interface LocationFormProps {
   locations: Address[];
@@ -18,6 +21,14 @@ const emptyLocation: Address = {
 };
 
 export function LocationForm({ locations, onChange }: LocationFormProps) {
+  const [suggestions, setSuggestions] = React.useState<Address[]>([]);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [typeaheadSuggestions, setTypeaheadSuggestions] = React.useState<Address[]>([]);
+  const [activeTypeaheadIndex, setActiveTypeaheadIndex] = React.useState<number>(-1);
+  const [showTypeahead, setShowTypeahead] = React.useState<{[key: number]: boolean}>({});
+  const [validationErrors, setValidationErrors] = React.useState<string[]>([]);
+  const typeaheadRef = React.useRef<HTMLDivElement>(null);
+
   const handleAddLocation = () => {
     onChange([...locations, { ...emptyLocation }]);
   };
@@ -27,6 +38,17 @@ export function LocationForm({ locations, onChange }: LocationFormProps) {
   };
 
   const handleLocationChange = (index: number, field: keyof Address, value: string) => {
+    setValidationErrors([]);
+    setSuggestions([]);
+
+    if (field === 'street1') {
+      setShowTypeahead(prev => ({ ...prev, [index]: true }));
+      setActiveTypeaheadIndex(-1);
+      debouncedGetSuggestions(value, index);
+    } else {
+      setShowTypeahead(prev => ({ ...prev, [index]: false }));
+    }
+
     const updatedLocations = locations.map((location, i) => {
       if (i === index) {
         return { ...location, [field]: value };
@@ -34,6 +56,103 @@ export function LocationForm({ locations, onChange }: LocationFormProps) {
       return location;
     });
     onChange(updatedLocations);
+  };
+
+  const debouncedGetSuggestions = useDebounce(async (value: string, index: number) => {
+    if (!value || value.length < 3) {
+      setTypeaheadSuggestions([]);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const location = locations[index];
+      const suggestions = await getAddressSuggestions(value, location.state);
+      setTypeaheadSuggestions(suggestions);
+    } catch (error) {
+      console.error('Error getting typeahead suggestions:', error);
+      setTypeaheadSuggestions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, 300);
+
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (typeaheadRef.current && !typeaheadRef.current.contains(e.target as Node)) {
+        setShowTypeahead({});
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (!showTypeahead[index]) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setActiveTypeaheadIndex(prev => 
+          prev < typeaheadSuggestions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setActiveTypeaheadIndex(prev => prev > -1 ? prev - 1 : prev);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (activeTypeaheadIndex >= 0 && typeaheadSuggestions[activeTypeaheadIndex]) {
+          handleApplySuggestion(index, typeaheadSuggestions[activeTypeaheadIndex]);
+          setShowTypeahead(prev => ({ ...prev, [index]: false }));
+        }
+        break;
+      case 'Escape':
+        setShowTypeahead(prev => ({ ...prev, [index]: false }));
+        break;
+    }
+  };
+
+  const handleGetSuggestions = async (index: number) => {
+    setIsLoading(true);
+    try {
+      const location = locations[index];
+      const locationSuggestions = await suggestLocation(location);
+      setSuggestions(locationSuggestions.map(s => s.address));
+    } catch (error) {
+      console.error('Error getting location suggestions:', error);
+    }
+    setIsLoading(false);
+  };
+
+  const handleApplySuggestion = (index: number, suggestion: Address) => {
+    const updatedLocations = locations.map((location, i) => 
+      i === index ? suggestion : location
+    );
+    onChange(updatedLocations);
+    setSuggestions([]);
+  };
+
+  const handleValidateLocation = async (index: number) => {
+    setIsLoading(true);
+    try {
+      const location = locations[index];
+      const validation = await validateAddress(location);
+      if (!validation.isValid) {
+        setValidationErrors(validation.errors || []);
+        if (validation.suggestions) {
+          setSuggestions(validation.suggestions);
+        }
+      } else {
+        setValidationErrors([]);
+        setSuggestions([]);
+      }
+    } catch (error) {
+      console.error('Error validating location:', error);
+    }
+    setIsLoading(false);
   };
 
   return (
@@ -62,10 +181,34 @@ export function LocationForm({ locations, onChange }: LocationFormProps) {
             <button
               type="button"
               onClick={() => handleRemoveLocation(index)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors"
+              className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors z-10"
             >
               <Trash2 className="w-4 h-4" />
             </button>
+
+            <div className="absolute top-4 right-12 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleValidateLocation(index)}
+                className="text-gray-400 hover:text-blue-500 transition-colors"
+                title="Validate Address"
+              >
+                <CheckCircle className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleGetSuggestions(index)}
+                disabled={isLoading}
+                className="text-gray-400 hover:text-blue-500 transition-colors disabled:opacity-50"
+                title="Get AI Suggestions"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Brain className="w-4 h-4" />
+                )}
+              </button>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -75,10 +218,63 @@ export function LocationForm({ locations, onChange }: LocationFormProps) {
                 <input
                   type="text"
                   value={location.street1}
-                  onChange={(e) => handleLocationChange(index, 'street1', e.target.value)}
+                  onChange={(e) => {
+                    handleLocationChange(index, 'street1', e.target.value);
+                  }}
+                  onKeyDown={(e) => handleKeyDown(e, index)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (location.street1) {
+                      setShowTypeahead(prev => ({ ...prev, [index]: true }));
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="123 Main St"
                 />
+                {showTypeahead[index] && (
+                  <div 
+                    ref={typeaheadRef}
+                    className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg border border-gray-200"
+                  >
+                    {isLoading && (
+                      <div className="px-3 py-2 text-sm text-gray-500">
+                        <Loader2 className="w-4 h-4 inline-block mr-1 animate-spin" />
+                        Loading suggestions...
+                      </div>
+                    )}
+                    {!isLoading && typeaheadSuggestions.length > 0 && (
+                    <ul className="py-1 max-h-60 overflow-auto">
+                      {typeaheadSuggestions.map((suggestion, i) => (
+                        <li
+                          key={i}
+                          className={`px-3 py-2 cursor-pointer text-sm ${
+                            i === activeTypeaheadIndex ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'
+                          }`}
+                          onClick={() => {
+                            handleApplySuggestion(index, suggestion);
+                            setShowTypeahead(prev => ({ ...prev, [index]: false }));
+                          }}
+                        >
+                          <div className="font-medium">{suggestion.street1}</div>
+                          <div className="text-gray-500">
+                            {formatAddress({
+                              city: suggestion.city,
+                              state: suggestion.state,
+                              zipCode: suggestion.zipCode
+                            })}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    )}
+                    {!isLoading && typeaheadSuggestions.length === 0 && location.street1.length >= 3 && (
+                      <div className="px-3 py-2 text-sm text-gray-500">
+                        <Search className="w-4 h-4 inline-block mr-1" />
+                        No suggestions found
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -141,6 +337,45 @@ export function LocationForm({ locations, onChange }: LocationFormProps) {
                 </div>
               </div>
             </div>
+            
+            {validationErrors.length > 0 && (
+              <div className="mt-4 p-3 bg-red-50 rounded-lg">
+                <div className="text-sm text-red-700">
+                  {validationErrors.map((error, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="text-red-400">•</span>
+                      {error}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {suggestions.length > 0 && (
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <div className="text-sm font-medium text-blue-900 mb-2">
+                  Suggested Addresses:
+                </div>
+                <div className="space-y-2">
+                  {suggestions.map((suggestion, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div className="text-sm text-blue-700">
+                        {suggestion.street1}
+                        {suggestion.street2 && <>, {suggestion.street2}</>}
+                        <br />
+                        {suggestion.city}, {suggestion.state} {suggestion.zipCode}
+                      </div>
+                      <button
+                        onClick={() => handleApplySuggestion(index, suggestion)}
+                        className="text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ))}
 

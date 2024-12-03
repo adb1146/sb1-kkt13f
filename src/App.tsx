@@ -54,17 +54,29 @@ const initialBusinessInfo: BusinessInfo = {
 };
 
 function App() {
-  const { user } = useSupabase();
+  const { user, signOut } = useSupabase();
   const [businessInfo, setBusinessInfo] = React.useState<BusinessInfo>(initialBusinessInfo);
   const [showAdmin, setShowAdmin] = React.useState(false);
   const [currentSection, setCurrentSection] = React.useState('business');
   const [activeTab, setActiveTab] = React.useState<'home' | 'new' | 'help'>('home');
   const [showAIAssistant, setShowAIAssistant] = React.useState(true);
   const [savedRatings, setSavedRatings] = React.useState<SavedRating[]>([]);
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [showTutorial, setShowTutorial] = React.useState(() => {
     const tutorialSeen = localStorage.getItem('tutorialSeen');
     return !tutorialSeen;
   });
+
+  const handleSignOut = async () => {
+    try {
+      setIsLoggingOut(true);
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   React.useEffect(() => {
     if (user) {
@@ -146,23 +158,15 @@ function App() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowAdmin(true)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
                 title="Rating Administration"
               >
                 <Settings className="w-4 h-4" />
                 Admin
               </button>
               <button
-                onClick={async () => await supabase.auth.signOut()}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700"
-                title="Sign Out"
-              >
-                <LogOut className="w-4 h-4" />
-                Sign Out
-              </button>
-              <button
                 onClick={() => setActiveTab('help')}
-                className={`px-4 py-2 text-sm font-medium rounded-md ${
+                className={`px-3 py-2 text-sm font-medium rounded-md ${
                   activeTab === 'help'
                     ? 'bg-blue-50 text-blue-700'
                     : 'text-gray-500 hover:text-gray-700'
@@ -171,26 +175,34 @@ function App() {
                 Help
               </button>
               {activeTab === 'new' && (
+                <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowAIAssistant(!showAIAssistant)}
-                  className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700"
+                  className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700"
                 >
                   <Brain className="w-4 h-4" />
                   {showAIAssistant ? 'Hide AI Assistant' : 'Show AI Assistant'}
                 </button>
-              )}
-              {activeTab === 'new' && (
                 <button
                   onClick={() => {
                     localStorage.removeItem('tutorialSeen');
                     setShowTutorial(true);
                   }}
-                  className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700"
+                  className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700"
                 >
                   <HelpCircle className="w-4 h-4" />
                   Show Guide
                 </button>
+                </div>
               )}
+              <button
+                onClick={handleSignOut}
+                disabled={isLoggingOut}
+                className="flex items-center gap-1 px-3 py-2 ml-2 text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <LogOut className="w-4 h-4" />
+                {isLoggingOut ? 'Signing Out...' : 'Sign Out'}
+              </button>
             </div>
           </div>
         </div>

@@ -1,6 +1,9 @@
 import { OpenAI } from 'openai';
 import { BusinessInfo } from '../../types';
 import { getOpenAIClient } from './config';
+import { verifyBusinessName } from '../businessNameVerification';
+import { suggestBusinessName, validateBusinessName } from './businessNameAssistant';
+import { generateBusinessDescription } from './businessDescriptionAssistant';
 
 export async function getContextualHelp(section: string, businessInfo: BusinessInfo): Promise<string> {
   try {
@@ -75,19 +78,83 @@ export async function getFieldSuggestions(
       return 'AI assistance is currently unavailable. Please configure your OpenAI API key.';
     }
 
-    const prompt = `As an insurance expert, provide a brief suggestion to improve this ${field} entry:
-      Current Value: ${currentValue}
-      Business Type: ${businessInfo.entityType}
-      Industry Context: ${businessInfo.description}`;
+    // Customize prompt based on field type
+    let prompt = '';
+    switch (field) {
+      case 'businessName':
+        // Validate current business name
+        const validation = validateBusinessName(currentValue);
+        if (!validation.isValid) {
+          // Get suggestions for invalid names
+          const suggestions = await suggestBusinessName(currentValue, businessInfo.entityType);
+          if (suggestions.length > 0) {
+            return suggestions[0].name;
+          }
+        }
+        break;
+        
+      case 'businessDescription':
+        // Use specialized business description generator
+        return generateBusinessDescription(businessInfo, currentValue);
+        break;
+        
+      case 'contactEmail':
+        prompt = `Provide ONLY a valid business email address:
+          Current Email: ${currentValue}
+          Business Name: ${businessInfo.name}
+          
+          Requirements:
+          - Return ONLY the email address
+          - Must be a valid email format
+          - No explanations or suggestions
+          - No additional text`;
+        break;
+        
+      case 'fein':
+        prompt = `Validate and format FEIN number:
+          Current FEIN: ${currentValue}
+          
+          Requirements:
+          - Return ONLY the formatted FEIN (XX-XXXXXXX)
+          - Must be exactly 9 digits
+          - Include hyphen after first 2 digits
+          - No additional text`;
+        break;
+        
+      case 'contactPhone':
+        prompt = `Format phone number:
+          Current Phone: ${currentValue}
+          
+          Requirements:
+          - Return ONLY the formatted phone number
+          - Use format: (XXX) XXX-XXXX
+          - Must be valid US phone number
+          - No additional text`;
+        break;
+        
+      default:
+        prompt = `Provide ONLY valid data for the ${field} field:
+          Current Value: ${currentValue}
+          Business Type: ${businessInfo.entityType}
+          Industry Context: ${businessInfo.description}
+          
+          Requirements:
+          - Return ONLY the field value
+          - Must match field type requirements
+          - No explanations or suggestions
+          - No additional text`;
+    }
 
     const completion = await openai.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "gpt-4-turbo-preview",
-      temperature: 0.7,
+      temperature: 0.3,
       max_tokens: 100
     });
 
-    return completion.choices[0].message.content || '';
+    // Clean the response to ensure only the field value is returned
+    const response = completion.choices[0].message.content || '';
+    return response.split('\n')[0].trim();
   } catch (error) {
     console.error('AI Suggestion Error:', error);
     return '';

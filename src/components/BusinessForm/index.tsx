@@ -1,6 +1,7 @@
 import React from 'react';
 import { Building2, Mail, Phone, HelpCircle, Info, Brain } from 'lucide-react';
 import { BusinessInfo, EntityType } from '../../types';
+import { AIDescriptionAssistant } from '../AIDescriptionAssistant';
 import { AIFieldAssistant } from '../AIFieldAssistant';
 import { ValidationMessage } from '../ValidationMessage';
 
@@ -175,10 +176,14 @@ export function BusinessForm({ data, onChange }: BusinessFormProps) {
             rows={4}
             placeholder="Detailed description of business operations..."
           />
-          <AIFieldAssistant
-            field="businessDescription"
+          <AIDescriptionAssistant
+            field="business"
             value={data.description}
-            businessInfo={data}
+            context={{
+              entityType: data.entityType,
+              yearsInBusiness: data.yearsInBusiness,
+              locations: data.locations.length
+            }}
             onSuggestion={(suggestion) => handleChange('description', suggestion)}
           />
           <div className="mt-1 text-sm text-gray-500 flex items-center gap-1">

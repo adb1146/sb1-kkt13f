@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle, Plus, Trash2, Calendar, User } from 'lucide-react';
 import { RiskControl } from '../../types';
+import { AIDescriptionAssistant } from '../AIDescriptionAssistant';
 
 interface RiskControlFormProps {
   riskControls: RiskControl[];
@@ -132,6 +133,16 @@ export function RiskControlForm({ riskControls, onChange }: RiskControlFormProps
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={2}
                   placeholder="Describe the measures in place to control this hazard..."
+                />
+                <AIDescriptionAssistant
+                  field="risk control measures"
+                  value={control.controlMeasures}
+                  context={{
+                    hazardType: control.hazardType,
+                    effectiveness: control.effectiveness,
+                    responsiblePerson: control.responsiblePerson
+                  }}
+                  onSuggestion={(suggestion) => handleControlChange(index, 'controlMeasures', suggestion)}
                 />
               </div>
             </div>

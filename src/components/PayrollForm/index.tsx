@@ -4,6 +4,7 @@ import { PayrollInfo } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
 import { states } from '../../utils/constants';
 import { ValidationMessage } from '../ValidationMessage';
+import { AIClassCodeAssistant } from '../AIClassCodeAssistant';
 import { supabase } from '../../utils/supabase';
 
 interface ClassCodeSearchResult {
@@ -228,6 +229,19 @@ export function PayrollForm({ payrollInfo, onChange }: PayrollFormProps) {
                     Select a state to search class codes
                   </div>
                 )}
+                <AIClassCodeAssistant
+                  stateCode={info.stateCode}
+                  workDescription={info.jobDescription}
+                  onSuggestion={({ classCode, description }) => {
+                    handleClassCodeSelect(index, {
+                      class_code: classCode,
+                      description,
+                      base_rate: 0,
+                      hazard_group: '',
+                      industry_group: ''
+                    });
+                  }}
+                />
               </div>
 
               <div>

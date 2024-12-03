@@ -1,6 +1,7 @@
 import React from 'react';
 import { FileWarning, Plus, Trash2, DollarSign } from 'lucide-react';
 import { LossHistory } from '../../types';
+import { AIDescriptionAssistant } from '../AIDescriptionAssistant';
 import { formatCurrency } from '../../utils/formatters';
 
 interface LossHistoryFormProps {
@@ -105,6 +106,17 @@ export function LossHistoryForm({ lossHistory, onChange }: LossHistoryFormProps)
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={2}
                   placeholder="Describe the circumstances of the loss..."
+                />
+                <AIDescriptionAssistant
+                  field="loss incident"
+                  value={loss.description}
+                  context={{
+                    type: loss.type,
+                    amount: loss.amount,
+                    status: loss.status,
+                    date: loss.date
+                  }}
+                  onSuggestion={(suggestion) => handleLossChange(index, 'description', suggestion)}
                 />
               </div>
 

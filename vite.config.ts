@@ -4,6 +4,20 @@ import { loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  
+  // Validate required environment variables
+  const requiredEnvVars = [
+    'VITE_SUPABASE_URL',
+    'VITE_SUPABASE_ANON_KEY',
+    'VITE_GOOGLE_MAPS_API_KEY'
+  ];
+  
+  for (const envVar of requiredEnvVars) {
+    if (!env[envVar]) {
+      console.warn(`Warning: ${envVar} is not set`);
+    }
+  }
+
   return {
     plugins: [
       react(),
@@ -22,7 +36,9 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
-      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY)
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
+      'import.meta.env.VITE_OPENAI_API_KEY': JSON.stringify(env.VITE_OPENAI_API_KEY),
+      'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify(env.VITE_GOOGLE_MAPS_API_KEY)
     },
     build: {
       rollupOptions: {

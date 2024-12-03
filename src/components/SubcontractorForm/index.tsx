@@ -1,6 +1,7 @@
 import React from 'react';
 import { Users, Plus, Trash2, Calendar, DollarSign } from 'lucide-react';
 import { SubcontractorInfo } from '../../types';
+import { AIDescriptionAssistant } from '../AIDescriptionAssistant';
 import { formatCurrency } from '../../utils/formatters';
 
 interface SubcontractorFormProps {
@@ -135,6 +136,16 @@ export function SubcontractorForm({ subcontractors, onChange }: SubcontractorFor
                   onChange={(e) => handleSubcontractorChange(index, 'employeeCount', parseInt(e.target.value) || 0)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   min="0"
+                />
+                <AIDescriptionAssistant
+                  field="subcontractor work"
+                  value={subcontractor.workType}
+                  context={{
+                    name: subcontractor.name,
+                    employeeCount: subcontractor.employeeCount,
+                    annualCost: subcontractor.annualCost
+                  }}
+                  onSuggestion={(suggestion) => handleSubcontractorChange(index, 'workType', suggestion)}
                 />
               </div>
             </div>

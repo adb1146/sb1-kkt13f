@@ -1,6 +1,7 @@
 import React from 'react';
 import { Shield, Plus, Trash2, Calendar } from 'lucide-react';
 import { SafetyProgram } from '../../types';
+import { AIDescriptionAssistant } from '../AIDescriptionAssistant';
 
 interface SafetyProgramFormProps {
   safetyPrograms: SafetyProgram[];
@@ -131,6 +132,16 @@ export function SafetyProgramForm({ safetyPrograms, onChange }: SafetyProgramFor
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   rows={2}
                   placeholder="Describe the safety program's objectives and key components..."
+                />
+                <AIDescriptionAssistant
+                  field="safety program"
+                  value={program.description}
+                  context={{
+                    programName: program.name,
+                    status: program.status,
+                    implementationDate: program.implementationDate
+                  }}
+                  onSuggestion={(suggestion) => handleProgramChange(index, 'description', suggestion)}
                 />
               </div>
             </div>

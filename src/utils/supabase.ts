@@ -1,82 +1,47 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Get environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000;
 
-interface HealthCheckResponse {
-  status: 'ok' | 'error' | 'maintenance';
-  details?: Record<string, any>;
+// Validate configuration
+if (!supabaseUrl) {
+  console.error('Missing VITE_SUPABASE_URL environment variable');
+  throw new Error('Invalid Supabase URL. Please check your environment variables.');
 }
 
-async function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+if (!supabaseKey) {
+  console.error('Missing VITE_SUPABASE_ANON_KEY environment variable');
+  throw new Error('Invalid Supabase API key. Please check your environment variables.');
 }
 
-function validateConfig(): { isValid: boolean; error?: string } {
-  if (!supabaseUrl || !supabaseKey) {
-    return { 
-      isValid: false, 
-      error: 'Missing Supabase configuration. Please check your environment variables.' 
-    };
-  }
-
-  try {
-    new URL(supabaseUrl);
-    return { isValid: true };
-  } catch (e) {
-    return { 
-      isValid: false, 
-      error: 'Invalid Supabase URL format. Please check your configuration.' 
-    };
-  }
-}
-
-const config = validateConfig();
-if (!config.isValid) {
-  console.error(config.error);
-}
-
-export const supabase = createClient(supabaseUrl || 'https://example.supabase.co', supabaseKey || '', {
+// Create Supabase client
+export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true
-  },
-  global: {
-    headers: { 'x-client-info': 'workers-comp-rating@1.0.0' },
-    fetch: fetch.bind(globalThis)
   }
 });
 
-export async function checkSupabaseConnection(retryCount = 0): Promise<boolean> {
-  if (!supabaseUrl || !supabaseKey) {
-    return false;
-  }
-
+// Health check function
+export async function checkSupabaseConnection(): Promise<boolean> {
   try {
+    // First try to get health check status
     const { data, error } = await supabase
       .from('health_check')
       .select('status')
       .limit(1)
       .single();
-    
+
     if (error) {
-      // If we haven't exceeded max retries, attempt again
-      if (retryCount < MAX_RETRIES) {
-        console.warn(`Supabase connection attempt ${retryCount + 1} failed, retrying...`);
-        await delay(RETRY_DELAY);
-        return checkSupabaseConnection(retryCount + 1);
-      }
-      throw error;
+      console.warn('Health check error:', error);
+      return false;
     }
-    
+
     return data?.status === 'ok';
   } catch (error) {
-    if (retryCount === MAX_RETRIES) {
-      console.error('Supabase connection failed after max retries:', error);
-    }
+    console.error('Supabase connection error:', error);
     return false;
   }
 }
@@ -88,10 +53,13 @@ export async function updateHealthCheck(
 ): Promise<void> {
   try {
     const { error } = await supabase
-      .rpc('update_health_check', {
-        new_status: status,
-        new_details: details ? JSON.stringify(details) : null
-      });
+      .from('health_check')
+      .update({
+        status,
+        details: details || {},
+        last_checked: new Date().toISOString()
+      })
+      .eq('id', 1);
 
     if (error) throw error;
   } catch (error) {
